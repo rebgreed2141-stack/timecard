@@ -1,0 +1,179 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 16px;
+  font-family: "Yu Gothic", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+  color: #222;
+  background: #ffffff;
+}
+
+.tabs {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.tab-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 22px;
+  border: 1px solid #b8c2cc;
+  border-radius: 10px;
+  background: #f3f5f7;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tab-btn.active {
+  background: #dfe9f3;
+}
+
+.tab-panel {
+  display: none;
+}
+
+.tab-panel.active {
+  display: block;
+}
+
+.staff-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.staff-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.staff-name {
+  width: 180px;
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 42px;
+  min-width: 128px;
+  padding: 0 18px;
+  border: 1px solid #b8c2cc;
+  border-radius: 10px;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.clock-in-btn {
+  background: #cfeecd;
+}
+
+.clock-out-btn {
+  background: #f6caca;
+}
+
+.list-wrap {
+  display: inline-block;
+}
+
+.list-date-title {
+  margin: 0 0 12px 0;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.time-table {
+  width: auto;
+  border-collapse: collapse;
+  table-layout: auto;
+  font-size: 15px;
+}
+
+.time-table th,
+.time-table td {
+  border: 1px solid #777;
+  padding: 10px 16px;
+  white-space: nowrap;
+}
+
+.time-table th {
+  background: #f5f5f5;
+  text-align: center;
+  font-weight: 700;
+}
+
+.time-table td:nth-child(2),
+.time-table td:nth-child(3) {
+  font-size: 18px;
+}
+
+.time-table tbody tr:nth-child(even) {
+  background: #eaf6ff;
+}
+
+.admin-wrap {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  min-height: 46px;
+  padding: 0 18px;
+  border: 1px solid #b8c2cc;
+  border-radius: 10px;
+  background: #f3f5f7;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.danger-btn {
+  background: #f6caca;
+}
+
+@media (max-width: 640px) {
+  body {
+    margin: 12px;
+  }
+
+  .tab-btn {
+    font-size: 18px;
+    min-height: 44px;
+    padding: 0 16px;
+  }
+
+  .staff-name {
+    width: 140px;
+    font-size: 18px;
+  }
+
+  .action-btn {
+    min-width: 110px;
+    font-size: 16px;
+  }
+
+  .time-table {
+    font-size: 14px;
+  }
+
+  .time-table td:nth-child(2),
+  .time-table td:nth-child(3) {
+    font-size: 17px;
+  }
+}
