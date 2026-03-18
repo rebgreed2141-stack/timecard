@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<link rel="manifest" href="manifest.json">
-<link rel="icon" href="icon-192.png">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>  
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon-192.png">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>タイムカード</title>
@@ -12,27 +12,37 @@
 <body>
   <div class="tabs">
     <button class="tab-btn active" data-tab="input">入力</button>
-    <button class="tab-btn" data-tab="list">一覧</button>
+    <button class="tab-btn" data-tab="calendar">カレンダー</button>
     <button class="tab-btn" data-tab="admin">管理</button>
   </div>
 
   <section id="tab-input" class="tab-panel active">
+    <div id="today-label" class="today-label"></div>
     <div id="staff-list" class="staff-list"></div>
   </section>
 
-  <section id="tab-list" class="tab-panel">
-    <div class="list-wrap">
-      <h2 id="list-date-title" class="list-date-title"></h2>
-      <table class="time-table">
-        <thead>
-          <tr>
-            <th>職員名</th>
-            <th>出勤</th>
-            <th>退勤</th>
-          </tr>
-        </thead>
-        <tbody id="list-body"></tbody>
-      </table>
+  <section id="tab-calendar" class="tab-panel">
+    <div class="calendar-wrap">
+      <div class="calendar-header">
+        <button id="prev-month-btn" class="month-nav-btn">前月</button>
+        <div class="calendar-title-wrap">
+          <h2 id="calendar-title" class="calendar-title"></h2>
+          <div id="calendar-period" class="calendar-period"></div>
+        </div>
+        <button id="next-month-btn" class="month-nav-btn">次月</button>
+      </div>
+
+      <div class="calendar-weekdays">
+        <div>月</div>
+        <div>火</div>
+        <div>水</div>
+        <div>木</div>
+        <div>金</div>
+        <div>土</div>
+        <div>日</div>
+      </div>
+
+      <div id="calendar-grid" class="calendar-grid"></div>
     </div>
   </section>
 
@@ -41,15 +51,15 @@
       <button id="backup-btn" class="admin-btn">バックアップ</button>
       <button id="restore-btn" class="admin-btn">データの復元</button>
       <button id="delete-btn" class="admin-btn danger-btn">データの削除</button>
-      <input type="file" id="restore-file" accept=".csv" hidden>
+      <input type="file" id="restore-file" accept=".zip" hidden>
     </div>
   </section>
 
   <script src="app.js"></script>
   <script>
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("./sw.js");
-  }
-  </script>  
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("./sw.js");
+    }
+  </script>
 </body>
 </html>
