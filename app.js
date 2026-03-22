@@ -57,23 +57,16 @@ function renderStaffList() {
   const dayData = loadDayData(dateKey);
 
   staffMaster.forEach((staff) => {
-    const record = dayData.records[staff.id] || {
-      id: staff.id,
-      name: staff.name,
-      in: "",
-      out: "",
-      history: { in: [], out: [] }
-    };
-
-    if (!record.history) {
-      record.history = { in: [], out: [] };
-    }
-    if (!Array.isArray(record.history.in)) {
-      record.history.in = [];
-    }
-    if (!Array.isArray(record.history.out)) {
-      record.history.out = [];
-    }
+    const record = normalizeRecord(
+      dayData.records[staff.id] || {
+        id: staff.id,
+        name: staff.name,
+        in: "",
+        out: "",
+        history: { in: [], out: [] }
+      },
+      staff
+    );
 
     const row = document.createElement("div");
     row.className = "staff-row";
@@ -120,29 +113,19 @@ function handleRecord(id, name, type) {
   const dayData = loadDayData(dateKey);
 
   if (!dayData.records[id]) {
-    dayData.records[id] = {
+    dayData.records[id] = normalizeRecord({
       id,
       name,
       in: "",
       out: "",
       history: { in: [], out: [] }
-    };
+    });
   }
 
-  const record = dayData.records[id];
-
-  if (!record.history) {
-    record.history = { in: [], out: [] };
-  }
-  if (!Array.isArray(record.history.in)) {
-    record.history.in = [];
-  }
-  if (!Array.isArray(record.history.out)) {
-    record.history.out = [];
-  }
-
+  const record = normalizeRecord(dayData.records[id], { id, name });
   record.history[type].push(record[type] || "");
   record[type] = time;
+  dayData.records[id] = record;
 
   saveDayData(dateKey, dayData);
   renderTodayLabel();
@@ -155,10 +138,9 @@ function handleUndo(id, name, type) {
   const dateKey = getDateKey(today);
   const label = type === "in" ? "出勤" : "退勤";
   const dayData = loadDayData(dateKey);
-  const record = dayData.records[id];
+  const record = dayData.records[id] ? normalizeRecord(dayData.records[id], { id, name }) : null;
 
   if (!record) return;
-  if (!record.history) return;
   if (!Array.isArray(record.history[type]) || record.history[type].length === 0) return;
 
   const ok = confirm(`${name}さんの${label}を1つ前の状態に戻しますか`);
@@ -169,6 +151,8 @@ function handleUndo(id, name, type) {
 
   if (!record.in && !record.out && record.history.in.length === 0 && record.history.out.length === 0) {
     delete dayData.records[id];
+  } else {
+    dayData.records[id] = record;
   }
 
   saveDayData(dateKey, dayData);
@@ -178,44 +162,70 @@ function handleUndo(id, name, type) {
 }
 
 async function backupCsv() {
-  const zip = new JSZip();
+  try {
+    const zip = new JSZip();
+    const keys = Object.keys(localStorage)
+      .filter((k) => k.startsWith(APP_KEY_PREFIX))
+      .sort();
 
-  Object.keys(localStorage)
-    .filter((k) => k.startsWith(APP_KEY_PREFIX))
-    .forEach((k) => {
-      zip.file(k + ".json", localStorage.getItem(k));
+    keys.forEach((storageKey) => {
+      const dateKey = storageKey.slice(APP_KEY_PREFIX.length);
+      const dayData = loadDayData(dateKey);
+      const csvText = buildCsvText(dateKey, dayData);
+      zip.file(`${storageKey}.csv`, csvText);
     });
 
-  const blob = await zip.generateAsync({ type: "blob" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = "timecard_backup.zip";
-  a.click();
+    const blob = await zip.generateAsync({ type: "blob" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "timecard_backup.zip";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error(error);
+    alert("バックアップに失敗しました");
+  }
 }
 
-function restoreCsv(e) {
+async function restoreCsv(e) {
   const file = e.target.files[0];
   if (!file) return;
 
-  JSZip.loadAsync(file).then((zip) => {
-    const promises = [];
+  try {
+    const zip = await JSZip.loadAsync(file);
+    const jobs = [];
 
     zip.forEach((path, fileEntry) => {
-      promises.push(
+      if (fileEntry.dir) return;
+      if (!path.toLowerCase().endsWith(".csv")) return;
+
+      jobs.push(
         fileEntry.async("string").then((text) => {
-          localStorage.setItem(path.replace(".json", ""), text);
+          const storageKey = path.replace(/^.*\//, "").replace(/\.csv$/i, "");
+          if (!storageKey.startsWith(APP_KEY_PREFIX)) return;
+
+          const dateKey = storageKey.slice(APP_KEY_PREFIX.length);
+          const dayData = parseCsvTextToDayData(text, dateKey);
+          saveDayData(dateKey, dayData);
         })
       );
     });
 
-    Promise.all(promises).then(() => {
-      renderTodayLabel();
-      renderStaffList();
-      renderCalendar(currentPayrollView.year, currentPayrollView.month);
-      document.getElementById("restore-file").value = "";
-      alert("復元完了");
-    });
-  });
+    await Promise.all(jobs);
+
+    renderTodayLabel();
+    renderStaffList();
+    renderCalendar(currentPayrollView.year, currentPayrollView.month);
+    document.getElementById("restore-file").value = "";
+    alert("復元完了");
+  } catch (error) {
+    console.error(error);
+    alert("復元に失敗しました");
+    document.getElementById("restore-file").value = "";
+  }
 }
 
 function deleteAllData() {
@@ -244,22 +254,8 @@ function loadDayData(dateKey) {
       parsed.records = {};
     }
 
-    Object.values(parsed.records).forEach((record) => {
-      if (!record.history) {
-        record.history = { in: [], out: [] };
-      }
-      if (!Array.isArray(record.history.in)) {
-        record.history.in = [];
-      }
-      if (!Array.isArray(record.history.out)) {
-        record.history.out = [];
-      }
-      if (!record.in) {
-        record.in = "";
-      }
-      if (!record.out) {
-        record.out = "";
-      }
+    Object.keys(parsed.records).forEach((id) => {
+      parsed.records[id] = normalizeRecord(parsed.records[id]);
     });
 
     return parsed;
@@ -270,6 +266,164 @@ function loadDayData(dateKey) {
 
 function saveDayData(dateKey, data) {
   localStorage.setItem(APP_KEY_PREFIX + dateKey, JSON.stringify(data));
+}
+
+function normalizeRecord(record, fallbackStaff = null) {
+  const safeRecord = record && typeof record === "object" ? record : {};
+  const safeHistory = safeRecord.history && typeof safeRecord.history === "object" ? safeRecord.history : {};
+
+  return {
+    id: safeRecord.id || (fallbackStaff && fallbackStaff.id) || "",
+    name: safeRecord.name || (fallbackStaff && fallbackStaff.name) || "",
+    in: safeRecord.in || "",
+    out: safeRecord.out || "",
+    history: {
+      in: Array.isArray(safeHistory.in) ? safeHistory.in : [],
+      out: Array.isArray(safeHistory.out) ? safeHistory.out : []
+    }
+  };
+}
+
+function buildCsvText(dateKey, dayData) {
+  const header = ["date", "id", "name", "clock_in", "clock_out"];
+  const lines = [header.map(toCsvCell).join(",")];
+
+  staffMaster.forEach((staff) => {
+    const record = dayData.records[staff.id];
+    if (!record) return;
+
+    const normalized = normalizeRecord(record, staff);
+    lines.push(
+      [dateKey, normalized.id, normalized.name, normalized.in, normalized.out]
+        .map(toCsvCell)
+        .join(",")
+    );
+  });
+
+  const remainingIds = Object.keys(dayData.records)
+    .filter((id) => !staffMaster.some((staff) => staff.id === id))
+    .sort((a, b) => a.localeCompare(b, "ja"));
+
+  remainingIds.forEach((id) => {
+    const normalized = normalizeRecord(dayData.records[id]);
+    lines.push(
+      [dateKey, normalized.id, normalized.name, normalized.in, normalized.out]
+        .map(toCsvCell)
+        .join(",")
+    );
+  });
+
+  return "\uFEFF" + lines.join("\r\n");
+}
+
+function parseCsvTextToDayData(csvText, fallbackDateKey) {
+  const rows = parseCsvRows(csvText);
+  const dayData = { records: {} };
+
+  if (rows.length === 0) return dayData;
+
+  const header = rows[0].map((v) => normalizeHeader(v));
+  const colIndex = {
+    date: header.indexOf("date"),
+    id: header.indexOf("id"),
+    name: header.indexOf("name"),
+    clockIn: header.indexOf("clock_in"),
+    clockOut: header.indexOf("clock_out")
+  };
+
+  for (let i = 1; i < rows.length; i += 1) {
+    const row = rows[i];
+    if (row.length === 1 && row[0] === "") continue;
+
+    const id = getCsvValue(row, colIndex.id).trim();
+    if (!id) continue;
+
+    const rowDate = getCsvValue(row, colIndex.date).trim() || fallbackDateKey;
+    if (rowDate !== fallbackDateKey) continue;
+
+    const name = getCsvValue(row, colIndex.name).trim();
+    const clockIn = normalizeTimeText(getCsvValue(row, colIndex.clockIn));
+    const clockOut = normalizeTimeText(getCsvValue(row, colIndex.clockOut));
+
+    dayData.records[id] = normalizeRecord({
+      id,
+      name,
+      in: clockIn,
+      out: clockOut,
+      history: { in: [], out: [] }
+    });
+  }
+
+  return dayData;
+}
+
+function parseCsvRows(text) {
+  const cleaned = String(text || "").replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < cleaned.length; i += 1) {
+    const ch = cleaned[i];
+    const next = cleaned[i + 1];
+
+    if (ch === '"') {
+      if (inQuotes && next === '"') {
+        cell += '"';
+        i += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (ch === "," && !inQuotes) {
+      row.push(cell);
+      cell = "";
+      continue;
+    }
+
+    if (ch === "\n" && !inQuotes) {
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = "";
+      continue;
+    }
+
+    cell += ch;
+  }
+
+  row.push(cell);
+  rows.push(row);
+  return rows;
+}
+
+function normalizeHeader(value) {
+  return String(value || "").replace(/^\uFEFF/, "").trim().toLowerCase();
+}
+
+function getCsvValue(row, index) {
+  if (index < 0 || index >= row.length) return "";
+  return row[index] || "";
+}
+
+function toCsvCell(value) {
+  const text = String(value ?? "");
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function normalizeTimeText(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+
+  const match = text.match(/^(\d{1,2}):(\d{1,2})$/);
+  if (!match) return "";
+
+  const hh = String(Number(match[1])).padStart(2, "0");
+  const mm = String(Number(match[2])).padStart(2, "0");
+  return `${hh}:${mm}`;
 }
 
 function getDateKey(date) {
