@@ -6,15 +6,21 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>出退勤アプリ Ver.1.0.0</title>
+  <title>タイムカード</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <body>
+
   <div class="tabs">
-    <button class="tab-btn active" data-tab="input">入力</button>
-    <button class="tab-btn" data-tab="calendar">カレンダー</button>
-    <button class="tab-btn" data-tab="admin">管理</button>
+    <div class="tabs-left">
+      <button class="tab-btn active" data-tab="input">入力</button>
+      <button class="tab-btn" data-tab="calendar">カレンダー</button>
+      <button class="tab-btn" data-tab="admin">管理</button>
+    </div>
+
+    <div class="app-version">
+      Ver.1.0.0
+    </div>
   </div>
 
   <section id="tab-input" class="tab-panel active">
