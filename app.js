@@ -286,6 +286,7 @@ function normalizeRecord(record, fallbackStaff = null) {
 
 function buildCsvText(dateKey, dayData) {
   const header = ["date", "id", "name", "clock_in", "clock_out"];
+  const csvDate = formatDateKeyForCsv(dateKey);
   const lines = [header.map(toCsvCell).join(",")];
 
   staffMaster.forEach((staff) => {
@@ -294,7 +295,7 @@ function buildCsvText(dateKey, dayData) {
 
     const normalized = normalizeRecord(record, staff);
     lines.push(
-      [dateKey, normalized.id, normalized.name, normalized.in, normalized.out]
+      [csvDate, normalized.id, normalized.name, normalized.in, normalized.out]
         .map(toCsvCell)
         .join(",")
     );
@@ -307,7 +308,7 @@ function buildCsvText(dateKey, dayData) {
   remainingIds.forEach((id) => {
     const normalized = normalizeRecord(dayData.records[id]);
     lines.push(
-      [dateKey, normalized.id, normalized.name, normalized.in, normalized.out]
+      [csvDate, normalized.id, normalized.name, normalized.in, normalized.out]
         .map(toCsvCell)
         .join(",")
     );
@@ -331,17 +332,21 @@ function parseCsvTextToDayData(csvText, fallbackDateKey) {
     clockOut: header.indexOf("clock_out")
   };
 
+  const normalizedFallbackDateKey = normalizeCsvDateToKey(fallbackDateKey) || fallbackDateKey;
+
   for (let i = 1; i < rows.length; i += 1) {
     const row = rows[i];
-    if (row.length === 1 && row[0] === "") continue;
+    if (row.length === 1 && String(row[0] || "").trim() === "") continue;
 
-    const id = getCsvValue(row, colIndex.id).trim();
+    const id = cleanCsvText(getCsvValue(row, colIndex.id));
     if (!id) continue;
 
-    const rowDate = getCsvValue(row, colIndex.date).trim() || fallbackDateKey;
-    if (rowDate !== fallbackDateKey) continue;
+    const rawRowDate = cleanCsvText(getCsvValue(row, colIndex.date));
+    const normalizedRowDateKey = normalizeCsvDateToKey(rawRowDate) || normalizedFallbackDateKey;
 
-    const name = getCsvValue(row, colIndex.name).trim();
+    if (normalizedRowDateKey !== normalizedFallbackDateKey) continue;
+
+    const name = cleanCsvText(getCsvValue(row, colIndex.name));
     const clockIn = normalizeTimeText(getCsvValue(row, colIndex.clockIn));
     const clockOut = normalizeTimeText(getCsvValue(row, colIndex.clockOut));
 
@@ -409,13 +414,17 @@ function getCsvValue(row, index) {
   return row[index] || "";
 }
 
+function cleanCsvText(value) {
+  return String(value ?? "").replace(/^\uFEFF/, "").trim();
+}
+
 function toCsvCell(value) {
   const text = String(value ?? "");
   return `"${text.replace(/"/g, '""')}"`;
 }
 
 function normalizeTimeText(value) {
-  const text = String(value || "").trim();
+  const text = cleanCsvText(value);
   if (!text) return "";
 
   const match = text.match(/^(\d{1,2}):(\d{1,2})$/);
@@ -424,6 +433,31 @@ function normalizeTimeText(value) {
   const hh = String(Number(match[1])).padStart(2, "0");
   const mm = String(Number(match[2])).padStart(2, "0");
   return `${hh}:${mm}`;
+}
+
+function normalizeCsvDateToKey(value) {
+  const text = cleanCsvText(value);
+  if (!text) return "";
+
+  const normalized = text
+    .replace(/[.\-]/g, "/")
+    .replace(/\s+/g, "");
+
+  const match = normalized.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
+  if (!match) return "";
+
+  const y = match[1];
+  const m = match[2].padStart(2, "0");
+  const d = match[3].padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function formatDateKeyForCsv(dateKey) {
+  const normalized = normalizeCsvDateToKey(dateKey);
+  if (!normalized) return "";
+
+  const [y, m, d] = normalized.split("-");
+  return `${y}/${m}/${d}`;
 }
 
 function getDateKey(date) {
