@@ -19,12 +19,7 @@ body {
 .tabs-left {
   display: flex;
   gap: 10px;
-}
-
-.app-version {
-  margin-left: auto;
-  font-size: 12px;
-  color: #666;
+  flex-wrap: wrap;
 }
 
 .tab-btn {
@@ -96,7 +91,8 @@ body {
 
 .action-btn,
 .back-btn,
-.month-nav-btn {
+.month-nav-btn,
+.admin-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -123,7 +119,8 @@ body {
   background: #f6caca;
 }
 
-.back-btn:disabled {
+.back-btn:disabled,
+.admin-btn:disabled {
   opacity: 0.45;
   cursor: default;
 }
@@ -252,124 +249,44 @@ body {
   white-space: nowrap;
 }
 
-.admin-wrap {
+.admin-wrap,
+.version-wrap {
   display: inline-flex;
   flex-direction: column;
   gap: 12px;
 }
 
-.admin-btn {
+.version-wrap {
+  min-width: 320px;
+  padding: 16px;
+  border: 1px solid #d6dde5;
+  border-radius: 12px;
+  background: #fbfdff;
+}
+
+.version-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.version-label {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.version-value {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: auto;
-  min-height: 46px;
-  padding: 0 18px;
-  border: 1px solid #b8c2cc;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid #d1d8df;
   border-radius: 10px;
-  background: #f3f5f7;
+  background: #ffffff;
   font-size: 18px;
-  line-height: 1;
-  cursor: pointer;
-  align-self: flex-start;
+  font-weight: 700;
 }
 
 .danger-btn {
   background: #f6caca;
-}
-
-@media (max-width: 900px) {
-  .calendar-cell {
-    min-height: 130px;
-  }
-
-  .staff-name {
-    width: 140px;
-    font-size: 18px;
-  }
-}
-
-@media (max-width: 640px) {
-  body {
-    margin: 12px;
-  }
-
-  .tabs {
-    gap: 8px;
-  }
-
-  .tab-btn {
-    font-size: 18px;
-    min-height: 44px;
-    padding: 0 16px;
-  }
-
-  .today-label {
-    font-size: 20px;
-  }
-
-  .staff-row {
-    align-items: flex-start;
-  }
-
-  .staff-name {
-    width: 100%;
-  }
-
-  .record-gap {
-    width: 100%;
-    min-width: 100%;
-    height: 2px;
-  }
-
-  .record-block {
-    width: 100%;
-    justify-content: flex-start;
-    flex-wrap: wrap;
-  }
-
-  .action-btn,
-  .back-btn,
-  .month-nav-btn {
-    min-width: 78px;
-    font-size: 16px;
-    height: 40px;
-  }
-
-  .time-value {
-    font-size: 18px;
-    height: 40px;
-  }
-
-  .calendar-header {
-    flex-wrap: wrap;
-  }
-
-  .calendar-title-wrap {
-    order: -1;
-    width: 100%;
-  }
-
-  .calendar-weekdays,
-  .calendar-grid {
-    gap: 4px;
-  }
-
-  .calendar-cell {
-    min-height: 100px;
-    padding: 6px;
-  }
-
-  .calendar-date {
-    font-size: 15px;
-  }
-
-  .calendar-weekday,
-  .calendar-mark-item {
-    font-size: 11px;
-  }
-
-  .mark-symbol {
-    font-size: 14px;
-  }
 }

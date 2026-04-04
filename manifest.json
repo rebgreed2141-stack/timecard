@@ -1,5 +1,5 @@
 {
-  "name": "出退勤アプリ Ver.1.0.0",
+  "name": "出退勤アプリ",
   "short_name": "タイムカード",
   "start_url": "./index.html",
   "display": "standalone",

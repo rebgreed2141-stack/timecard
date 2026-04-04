@@ -16,10 +16,7 @@
       <button class="tab-btn active" data-tab="input">入力</button>
       <button class="tab-btn" data-tab="calendar">カレンダー</button>
       <button class="tab-btn" data-tab="admin">管理</button>
-    </div>
-
-    <div class="app-version">
-      Ver.1.0.0
+      <button class="tab-btn" data-tab="version">バージョン</button>
     </div>
   </div>
 
@@ -62,11 +59,20 @@
     </div>
   </section>
 
+  <section id="tab-version" class="tab-panel">
+    <div class="version-wrap">
+      <div class="version-row">
+        <div class="version-label">現在のバージョン</div>
+        <div id="current-version" class="version-value">読み込み中...</div>
+      </div>
+      <div class="version-row">
+        <div class="version-label">最新のバージョン</div>
+        <div id="latest-version" class="version-value">確認中...</div>
+      </div>
+      <button id="update-btn" class="admin-btn" disabled>更新する</button>
+    </div>
+  </section>
+
   <script src="app.js"></script>
-  <script>
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("./sw.js");
-    }
-  </script>
 </body>
 </html>

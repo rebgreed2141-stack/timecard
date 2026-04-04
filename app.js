@@ -1,6 +1,14 @@
 const APP_KEY_PREFIX = "timecard_";
 let staffMaster = [];
 let currentPayrollView = null;
+let swRegistration = null;
+let isReloadingForUpdate = false;
+
+const versionState = {
+  current: "",
+  latest: "",
+  hasUpdate: false
+};
 
 document.addEventListener("DOMContentLoaded", async () => {
   setupTabs();
@@ -10,6 +18,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   currentPayrollView = getPayrollMonthByDate(new Date());
   renderCalendar(currentPayrollView.year, currentPayrollView.month);
   setupAdminButtons();
+  setupVersionButton();
+  await setupVersionManagement();
 });
 
 function setupTabs() {
@@ -30,6 +40,10 @@ function setupTabs() {
 
       if (button.dataset.tab === "calendar") {
         renderCalendar(currentPayrollView.year, currentPayrollView.month);
+      }
+
+      if (button.dataset.tab === "version") {
+        renderVersionPanel();
       }
     });
   });
@@ -625,4 +639,143 @@ function setupAdminButtons() {
   document.getElementById("delete-btn").addEventListener("click", deleteAllData);
   document.getElementById("prev-month-btn").addEventListener("click", () => movePayrollMonth(-1));
   document.getElementById("next-month-btn").addEventListener("click", () => movePayrollMonth(1));
+}
+
+function setupVersionButton() {
+  document.getElementById("update-btn").addEventListener("click", async () => {
+    if (!swRegistration || !swRegistration.waiting) return;
+    swRegistration.waiting.postMessage({ type: "SKIP_WAITING" });
+  });
+}
+
+async function setupVersionManagement() {
+  if (!("serviceWorker" in navigator)) {
+    versionState.current = await fetchVersionFromNetwork();
+    versionState.latest = "最新です";
+    versionState.hasUpdate = false;
+    renderVersionPanel();
+    return;
+  }
+
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (isReloadingForUpdate) return;
+    isReloadingForUpdate = true;
+    window.location.reload();
+  });
+
+  swRegistration = await navigator.serviceWorker.register("./sw.js");
+
+  if (swRegistration.installing) {
+    watchInstallingWorker(swRegistration.installing);
+  }
+
+  swRegistration.addEventListener("updatefound", () => {
+    if (swRegistration.installing) {
+      watchInstallingWorker(swRegistration.installing);
+    }
+  });
+
+  await swRegistration.update().catch(() => {});
+  await refreshVersionInfo();
+}
+
+function watchInstallingWorker(worker) {
+  worker.addEventListener("statechange", async () => {
+    if (worker.state === "installed") {
+      await refreshVersionInfo();
+    }
+  });
+}
+
+async function refreshVersionInfo() {
+  versionState.current = await getCurrentVersion();
+
+  if (swRegistration && swRegistration.waiting) {
+    versionState.latest = await getLatestVersion();
+    versionState.hasUpdate = !!versionState.latest && versionState.latest !== versionState.current;
+
+    if (!versionState.hasUpdate) {
+      versionState.latest = "最新です";
+    }
+  } else {
+    versionState.latest = "最新です";
+    versionState.hasUpdate = false;
+  }
+
+  renderVersionPanel();
+}
+
+function renderVersionPanel() {
+  const currentEl = document.getElementById("current-version");
+  const latestEl = document.getElementById("latest-version");
+  const updateBtn = document.getElementById("update-btn");
+
+  currentEl.textContent = versionState.current || "取得できません";
+  latestEl.textContent = versionState.latest || "取得できません";
+  updateBtn.disabled = !versionState.hasUpdate;
+}
+
+async function getCurrentVersion() {
+  const controlledVersion = await getVersionFromActiveServiceWorker();
+  if (controlledVersion) return controlledVersion;
+
+  const cachedVersion = await fetchVersionFromNetwork("reload");
+  if (cachedVersion) return cachedVersion;
+
+  return "取得できません";
+}
+
+async function getLatestVersion() {
+  const networkVersion = await fetchVersionFromNetwork();
+  if (networkVersion) return networkVersion;
+
+  const waitingVersion = await getVersionFromWaitingServiceWorker();
+  if (waitingVersion) return waitingVersion;
+
+  return "取得できません";
+}
+
+async function fetchVersionFromNetwork(cacheMode = "no-store") {
+  try {
+    const response = await fetch("./version.json", { cache: cacheMode });
+    if (!response.ok) return "";
+    const data = await response.json();
+    return normalizeVersionValue(data && data.version);
+  } catch (error) {
+    return "";
+  }
+}
+
+async function getVersionFromActiveServiceWorker() {
+  if (!navigator.serviceWorker.controller) return "";
+  return requestVersionFromWorker(navigator.serviceWorker.controller);
+}
+
+async function getVersionFromWaitingServiceWorker() {
+  if (!swRegistration || !swRegistration.waiting) return "";
+  return requestVersionFromWorker(swRegistration.waiting);
+}
+
+function requestVersionFromWorker(worker) {
+  return new Promise((resolve) => {
+    const channel = new MessageChannel();
+    const timer = setTimeout(() => resolve(""), 2000);
+
+    channel.port1.onmessage = (event) => {
+      clearTimeout(timer);
+      resolve(normalizeVersionValue(event.data && event.data.version));
+    };
+
+    try {
+      worker.postMessage({ type: "GET_VERSION" }, [channel.port2]);
+    } catch (error) {
+      clearTimeout(timer);
+      resolve("");
+    }
+  });
+}
+
+function normalizeVersionValue(value) {
+  const text = String(value || "").trim();
+  return text || "";
 }
