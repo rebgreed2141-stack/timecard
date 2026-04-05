@@ -2,7 +2,6 @@ const APP_KEY_PREFIX = "timecard_";
 let staffMaster = [];
 let currentPayrollView = null;
 let swRegistration = null;
-let isReloadingForUpdate = false;
 
 const versionState = {
   current: "",
@@ -643,8 +642,21 @@ function setupAdminButtons() {
 
 function setupVersionButton() {
   document.getElementById("update-btn").addEventListener("click", async () => {
-    if (!swRegistration || !swRegistration.waiting) return;
-    swRegistration.waiting.postMessage({ type: "SKIP_WAITING" });
+    if (!swRegistration) return;
+
+    try {
+      await swRegistration.update();
+    } catch (error) {
+      return;
+    }
+
+    const waitingWorker = swRegistration.waiting;
+    if (!waitingWorker) {
+      await refreshVersionInfo();
+      return;
+    }
+
+    await activateWaitingWorker(waitingWorker);
   });
 }
 
@@ -657,34 +669,8 @@ async function setupVersionManagement() {
     return;
   }
 
-  navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (isReloadingForUpdate) return;
-    isReloadingForUpdate = true;
-    window.location.reload();
-  });
-
   swRegistration = await navigator.serviceWorker.register("./sw.js");
-
-  if (swRegistration.installing) {
-    watchInstallingWorker(swRegistration.installing);
-  }
-
-  swRegistration.addEventListener("updatefound", () => {
-    if (swRegistration.installing) {
-      watchInstallingWorker(swRegistration.installing);
-    }
-  });
-
-  await swRegistration.update().catch(() => {});
   await refreshVersionInfo();
-}
-
-function watchInstallingWorker(worker) {
-  worker.addEventListener("statechange", async () => {
-    if (worker.state === "installed") {
-      await refreshVersionInfo();
-    }
-  });
 }
 
 async function refreshVersionInfo() {
@@ -703,6 +689,38 @@ async function refreshVersionInfo() {
   }
 
   renderVersionPanel();
+}
+
+async function activateWaitingWorker(waitingWorker) {
+  await new Promise((resolve) => {
+    let settled = false;
+
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+
+    const timer = setTimeout(finish, 4000);
+
+    navigator.serviceWorker.addEventListener(
+      "controllerchange",
+      () => {
+        clearTimeout(timer);
+        finish();
+      },
+      { once: true }
+    );
+
+    try {
+      waitingWorker.postMessage({ type: "SKIP_WAITING" });
+    } catch (error) {
+      clearTimeout(timer);
+      finish();
+    }
+  });
+
+  window.location.reload();
 }
 
 function renderVersionPanel() {
