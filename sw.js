@@ -1,10 +1,11 @@
-const CACHE_NAME = "timecard-v2";
+const CACHE_NAME = "timecard-v3";
 const CORE_ASSETS = [
   "./",
   "./index.html",
   "./app.js",
   "./styles.css",
-  "./staff.json",
+  "./staff_m.json",
+  "./staff_y.json",
   "./manifest.json",
   "./version.json",
   "./icon-192.png",

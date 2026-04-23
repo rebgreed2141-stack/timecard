@@ -1,5 +1,13 @@
 const APP_KEY_PREFIX = "timecard_";
+const NURSERY_STORAGE_KEY = "selectedNursery";
+const DEFAULT_NURSERY = "m";
+const NURSERY_CONFIG = {
+  m: { label: "こどもの森保育園", staffFile: "./staff_m.json" },
+  y: { label: "こどもの森You保育園", staffFile: "./staff_y.json" }
+};
+
 let staffMaster = [];
+let currentNursery = DEFAULT_NURSERY;
 let currentPayrollView = null;
 let swRegistration = null;
 
@@ -11,6 +19,7 @@ const versionState = {
 
 document.addEventListener("DOMContentLoaded", async () => {
   setupTabs();
+  setupNurserySettings();
   await loadStaffMaster();
   renderTodayLabel();
   renderStaffList();
@@ -49,9 +58,85 @@ function setupTabs() {
 }
 
 async function loadStaffMaster() {
-  const response = await fetch("./staff.json");
+  const config = getNurseryConfig(currentNursery);
+  const response = await fetch(config.staffFile);
   staffMaster = await response.json();
   staffMaster.sort((a, b) => a.id.localeCompare(b.id, "ja"));
+  renderNurseryCurrent();
+}
+
+function setupNurserySettings() {
+  currentNursery = getSavedNursery();
+
+  const radios = document.querySelectorAll('input[name="nursery"]');
+  radios.forEach((radio) => {
+    radio.checked = radio.value === currentNursery;
+    radio.addEventListener("change", handleNurseryChange);
+  });
+
+  renderNurseryCurrent();
+}
+
+function getSavedNursery() {
+  const saved = localStorage.getItem(NURSERY_STORAGE_KEY);
+  return NURSERY_CONFIG[saved] ? saved : DEFAULT_NURSERY;
+}
+
+function getNurseryConfig(nurseryKey) {
+  return NURSERY_CONFIG[nurseryKey] || NURSERY_CONFIG[DEFAULT_NURSERY];
+}
+
+function renderNurseryCurrent() {
+  const el = document.getElementById("nursery-current");
+  if (!el) return;
+
+  const config = getNurseryConfig(currentNursery);
+  el.textContent = `現在の設定：${config.label}`;
+}
+
+async function handleNurseryChange(event) {
+  const selected = event.target.value;
+  if (!NURSERY_CONFIG[selected]) return;
+
+  if (selected === currentNursery) {
+    renderNurseryCurrent();
+    return;
+  }
+
+  const nextLabel = getNurseryConfig(selected).label;
+  const ok = confirm(`保育園設定を${nextLabel}に変更しますか`);
+
+  if (!ok) {
+    syncNurseryRadio();
+    return;
+  }
+
+  currentNursery = selected;
+  localStorage.setItem(NURSERY_STORAGE_KEY, currentNursery);
+
+  try {
+    await loadStaffMaster();
+    renderTodayLabel();
+    renderStaffList();
+    renderCalendar(currentPayrollView.year, currentPayrollView.month);
+  } catch (error) {
+    console.error(error);
+    alert("職員データの読み込みに失敗しました");
+    currentNursery = getSavedNursery();
+    syncNurseryRadio();
+    await loadStaffMaster();
+    renderTodayLabel();
+    renderStaffList();
+    renderCalendar(currentPayrollView.year, currentPayrollView.month);
+  }
+}
+
+function syncNurseryRadio() {
+  const radios = document.querySelectorAll('input[name="nursery"]');
+  radios.forEach((radio) => {
+    radio.checked = radio.value === currentNursery;
+  });
+  renderNurseryCurrent();
 }
 
 function renderTodayLabel() {

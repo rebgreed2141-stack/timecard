@@ -52,10 +52,27 @@
 
   <section id="tab-admin" class="tab-panel">
     <div class="admin-wrap">
-      <button id="backup-btn" class="admin-btn">バックアップ</button>
-      <button id="restore-btn" class="admin-btn">データの復元</button>
-      <button id="delete-btn" class="admin-btn danger-btn">データの削除</button>
-      <input type="file" id="restore-file" accept=".zip" hidden>
+      <div class="admin-card nursery-card">
+        <div class="admin-card-title">保育園設定</div>
+        <div class="nursery-radio-group">
+          <label class="nursery-radio-option">
+            <input type="radio" name="nursery" value="m" id="nursery-m">
+            <span>こどもの森保育園</span>
+          </label>
+          <label class="nursery-radio-option">
+            <input type="radio" name="nursery" value="y" id="nursery-y">
+            <span>こどもの森You保育園</span>
+          </label>
+        </div>
+        <div id="nursery-current" class="nursery-current"></div>
+      </div>
+
+      <div class="admin-card">
+        <button id="backup-btn" class="admin-btn">バックアップ</button>
+        <button id="restore-btn" class="admin-btn">データの復元</button>
+        <button id="delete-btn" class="admin-btn danger-btn">データの削除</button>
+        <input type="file" id="restore-file" accept=".zip" hidden>
+      </div>
     </div>
   </section>
 
