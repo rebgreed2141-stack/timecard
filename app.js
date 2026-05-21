@@ -61,6 +61,7 @@ async function loadStaffMaster() {
   const config = getNurseryConfig(currentNursery);
   const response = await fetch(config.staffFile);
   staffMaster = await response.json();
+  staffMaster = staffMaster.filter((staff) => staff.active !== false);
   staffMaster.sort((a, b) => a.id.localeCompare(b.id, "ja"));
   renderNurseryCurrent();
 }
