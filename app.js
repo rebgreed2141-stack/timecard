@@ -1,6 +1,7 @@
 const APP_KEY_PREFIX = "timecard_";
 const NURSERY_STORAGE_KEY = "selectedNursery";
 const DEFAULT_NURSERY = "m";
+const BACKUP_FILE_NAME = "timecard_backup.zip";
 const NURSERY_CONFIG = {
   m: { label: "こどもの森保育園", staffFile: "./staff_m.json" },
   y: { label: "こどもの森You保育園", staffFile: "./staff_y.json" }
@@ -459,25 +460,29 @@ function handleUndo(id, name, type) {
   renderStaffEditViewIfOpen();
 }
 
+async function createBackupZipBlob() {
+  const zip = new JSZip();
+  const keys = Object.keys(localStorage)
+    .filter((k) => k.startsWith(APP_KEY_PREFIX))
+    .sort();
+
+  keys.forEach((storageKey) => {
+    const dateKey = storageKey.slice(APP_KEY_PREFIX.length);
+    const dayData = loadDayData(dateKey);
+    const csvText = buildCsvText(dateKey, dayData);
+    zip.file(`${storageKey}.csv`, csvText);
+  });
+
+  return zip.generateAsync({ type: "blob" });
+}
+
 async function backupCsv() {
   try {
-    const zip = new JSZip();
-    const keys = Object.keys(localStorage)
-      .filter((k) => k.startsWith(APP_KEY_PREFIX))
-      .sort();
-
-    keys.forEach((storageKey) => {
-      const dateKey = storageKey.slice(APP_KEY_PREFIX.length);
-      const dayData = loadDayData(dateKey);
-      const csvText = buildCsvText(dateKey, dayData);
-      zip.file(`${storageKey}.csv`, csvText);
-    });
-
-    const blob = await zip.generateAsync({ type: "blob" });
+    const blob = await createBackupZipBlob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "timecard_backup.zip";
+    a.download = BACKUP_FILE_NAME;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -485,6 +490,36 @@ async function backupCsv() {
   } catch (error) {
     console.error(error);
     alert("バックアップに失敗しました");
+  }
+}
+
+async function sendBackupToServer() {
+  const ok = confirm("バックアップZIPをサーバーに送信しますか？");
+  if (!ok) return;
+
+  try {
+    const blob = await createBackupZipBlob();
+    const response = await fetch(`/api/backup?filename=${encodeURIComponent(BACKUP_FILE_NAME)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/zip" },
+      body: blob
+    });
+
+    let result = null;
+    try {
+      result = await response.json();
+    } catch (error) {
+      result = null;
+    }
+
+    if (!response.ok || !result || result.ok !== true) {
+      throw new Error(result && result.message ? result.message : "送信失敗");
+    }
+
+    alert("サーバーに送信しました。\n" + BACKUP_FILE_NAME);
+  } catch (error) {
+    console.error(error);
+    alert("サーバーに送信できませんでした。\nサーバーが起動しているか確認してください。");
   }
 }
 
@@ -925,6 +960,7 @@ function escapeJs(value) {
 
 function setupAdminButtons() {
   document.getElementById("backup-btn").addEventListener("click", backupCsv);
+  document.getElementById("server-backup-btn").addEventListener("click", sendBackupToServer);
   document.getElementById("restore-btn").addEventListener("click", () => {
     document.getElementById("restore-file").click();
   });
