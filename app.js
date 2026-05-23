@@ -9,6 +9,8 @@ const NURSERY_CONFIG = {
 let staffMaster = [];
 let currentNursery = DEFAULT_NURSERY;
 let currentPayrollView = null;
+let staffEditView = null;
+let selectedEditStaff = null;
 let swRegistration = null;
 
 const versionState = {
@@ -42,6 +44,7 @@ function setupTabs() {
       document.getElementById(`tab-${button.dataset.tab}`).classList.add("active");
 
       if (button.dataset.tab === "input") {
+        closeStaffEditView();
         renderTodayLabel();
         renderStaffList();
       }
@@ -112,6 +115,7 @@ async function handleNurseryChange(event) {
     return;
   }
 
+  closeStaffEditView();
   currentNursery = selected;
   localStorage.setItem(NURSERY_STORAGE_KEY, currentNursery);
 
@@ -171,7 +175,7 @@ function renderStaffList() {
     row.className = "staff-row";
 
     row.innerHTML = `
-      <div class="staff-name">${escapeHtml(staff.name)}</div>
+      <button class="staff-name staff-name-btn" onclick="openStaffEditView('${staff.id}')">${escapeHtml(staff.name)}</button>
 
       <div class="record-block in-block">
         <button class="action-btn clock-in-btn" onclick="handleRecord('${staff.id}','${escapeJs(staff.name)}','in')">出勤</button>
@@ -198,6 +202,199 @@ function renderStaffList() {
 
     container.appendChild(row);
   });
+}
+
+
+function openStaffEditView(staffId) {
+  const staff = staffMaster.find((item) => item.id === staffId);
+  if (!staff) return;
+
+  selectedEditStaff = staff;
+  staffEditView = getPayrollMonthByDate(new Date());
+  renderStaffEditView();
+}
+
+function closeStaffEditView() {
+  selectedEditStaff = null;
+  staffEditView = null;
+  const panel = document.getElementById("staff-edit-panel");
+  if (panel) {
+    panel.classList.remove("active");
+    panel.innerHTML = "";
+  }
+  document.getElementById("today-label").style.display = "";
+  document.getElementById("staff-list").style.display = "";
+}
+
+function renderStaffEditViewIfOpen() {
+  if (selectedEditStaff && staffEditView) {
+    renderStaffEditView();
+  }
+}
+
+function renderStaffEditView() {
+  const panel = document.getElementById("staff-edit-panel");
+  if (!panel || !selectedEditStaff || !staffEditView) return;
+
+  document.getElementById("today-label").style.display = "none";
+  document.getElementById("staff-list").style.display = "none";
+
+  const { start, end } = getCalendarMonthRange(staffEditView.year, staffEditView.month);
+  const rows = [];
+
+  for (let cursor = new Date(start); cursor <= end; cursor.setDate(cursor.getDate() + 1)) {
+    const targetDate = new Date(cursor);
+    const dateKey = getDateKey(targetDate);
+    const dayData = loadDayData(dateKey);
+    const record = dayData.records[selectedEditStaff.id]
+      ? normalizeRecord(dayData.records[selectedEditStaff.id], selectedEditStaff)
+      : normalizeRecord({ id: selectedEditStaff.id, name: selectedEditStaff.name }, selectedEditStaff);
+
+    const weekday = ["日", "月", "火", "水", "木", "金", "土"][targetDate.getDay()];
+    const statusText = record.in || record.out
+      ? `${record.in || "＿＿＿"}　${record.out || "＿＿＿"}`
+      : "休み";
+    const editedMark = record.edited ? "　修正済" : "";
+
+    rows.push(`
+      <button class="staff-edit-date-row" data-date-key="${dateKey}">
+        <span class="staff-edit-date">${targetDate.getMonth() + 1}/${String(targetDate.getDate()).padStart(2, "0")}（${weekday}）</span>
+        <span class="staff-edit-times">${escapeHtml(statusText)}${editedMark}</span>
+      </button>
+    `);
+  }
+
+  panel.classList.add("active");
+  panel.innerHTML = `
+    <div class="staff-edit-header">
+      <button class="staff-edit-nav-btn" id="staff-edit-prev-month">＜ 前の月</button>
+      <div class="staff-edit-title-wrap">
+        <div class="staff-edit-month">${staffEditView.year}年${staffEditView.month}月</div>
+        <div class="staff-edit-name">${escapeHtml(selectedEditStaff.name)}</div>
+      </div>
+      <button class="staff-edit-nav-btn" id="staff-edit-next-month">次の月 ＞</button>
+    </div>
+    <div class="staff-edit-period">1日 ～ ${end.getDate()}日</div>
+    <div class="staff-edit-list">${rows.join("")}</div>
+  `;
+
+  document.getElementById("staff-edit-prev-month").addEventListener("click", () => moveStaffEditMonth(-1));
+  document.getElementById("staff-edit-next-month").addEventListener("click", () => moveStaffEditMonth(1));
+  panel.querySelectorAll(".staff-edit-date-row").forEach((button) => {
+    button.addEventListener("click", () => openRecordEditDialog(button.dataset.dateKey));
+  });
+}
+
+function moveStaffEditMonth(diff) {
+  if (!staffEditView) return;
+
+  staffEditView.month += diff;
+
+  while (staffEditView.month < 1) {
+    staffEditView.month += 12;
+    staffEditView.year -= 1;
+  }
+
+  while (staffEditView.month > 12) {
+    staffEditView.month -= 12;
+    staffEditView.year += 1;
+  }
+
+  renderStaffEditView();
+}
+
+function openRecordEditDialog(dateKey) {
+  if (!selectedEditStaff) return;
+
+  const dayData = loadDayData(dateKey);
+  const record = dayData.records[selectedEditStaff.id]
+    ? normalizeRecord(dayData.records[selectedEditStaff.id], selectedEditStaff)
+    : normalizeRecord({ id: selectedEditStaff.id, name: selectedEditStaff.name }, selectedEditStaff);
+
+  const date = dateKeyToDate(dateKey);
+  const weekday = ["日", "月", "火", "水", "木", "金", "土"][date.getDay()];
+
+  const overlay = document.createElement("div");
+  overlay.className = "record-edit-overlay";
+  overlay.innerHTML = `
+    <div class="record-edit-dialog">
+      <div class="record-edit-title">${date.getMonth() + 1}/${date.getDate()}（${weekday}）の修正</div>
+      <div class="record-edit-staff-name">${escapeHtml(selectedEditStaff.name)}</div>
+      <label class="record-edit-field">
+        <span>出勤</span>
+        <input id="edit-clock-in" type="time" value="${escapeHtml(record.in)}">
+      </label>
+      <label class="record-edit-field">
+        <span>退勤</span>
+        <input id="edit-clock-out" type="time" value="${escapeHtml(record.out)}">
+      </label>
+      <div class="record-edit-actions">
+        <button id="record-edit-save" class="record-edit-save-btn">保存</button>
+        <button id="record-edit-cancel" class="record-edit-cancel-btn">キャンセル</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  document.getElementById("record-edit-cancel").addEventListener("click", () => overlay.remove());
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay) overlay.remove();
+  });
+  document.getElementById("record-edit-save").addEventListener("click", () => {
+    saveManualRecordEdit(dateKey, record, overlay);
+  });
+}
+
+function saveManualRecordEdit(dateKey, oldRecord, overlay) {
+  if (!selectedEditStaff) return;
+
+  const newIn = normalizeTimeText(document.getElementById("edit-clock-in").value);
+  const newOut = normalizeTimeText(document.getElementById("edit-clock-out").value);
+
+  if (document.getElementById("edit-clock-in").value && !newIn) {
+    alert("出勤時間は 08:30 の形で入力してください");
+    return;
+  }
+
+  if (document.getElementById("edit-clock-out").value && !newOut) {
+    alert("退勤時間は 17:30 の形で入力してください");
+    return;
+  }
+
+  const dayData = loadDayData(dateKey);
+  const record = normalizeRecord(oldRecord, selectedEditStaff);
+
+  if (record.in !== newIn) {
+    record.history.in.push(record.in || "");
+  }
+
+  if (record.out !== newOut) {
+    record.history.out.push(record.out || "");
+  }
+
+  record.id = selectedEditStaff.id;
+  record.name = selectedEditStaff.name;
+  record.in = newIn;
+  record.out = newOut;
+  record.edited = true;
+
+  if (!record.in && !record.out) {
+    delete dayData.records[selectedEditStaff.id];
+  } else {
+    dayData.records[selectedEditStaff.id] = record;
+  }
+
+  saveDayData(dateKey, dayData);
+  overlay.remove();
+  renderStaffList();
+  renderCalendar(currentPayrollView.year, currentPayrollView.month);
+  renderStaffEditView();
+}
+
+function dateKeyToDate(dateKey) {
+  const [year, month, day] = dateKey.split("-").map((value) => Number(value));
+  return new Date(year, month - 1, day);
 }
 
 function handleRecord(id, name, type) {
@@ -230,6 +427,7 @@ function handleRecord(id, name, type) {
   renderTodayLabel();
   renderStaffList();
   renderCalendar(currentPayrollView.year, currentPayrollView.month);
+  renderStaffEditViewIfOpen();
 }
 
 function handleUndo(id, name, type) {
@@ -258,6 +456,7 @@ function handleUndo(id, name, type) {
   renderTodayLabel();
   renderStaffList();
   renderCalendar(currentPayrollView.year, currentPayrollView.month);
+  renderStaffEditViewIfOpen();
 }
 
 async function backupCsv() {
@@ -318,6 +517,7 @@ async function restoreCsv(e) {
     renderTodayLabel();
     renderStaffList();
     renderCalendar(currentPayrollView.year, currentPayrollView.month);
+    renderStaffEditViewIfOpen();
     document.getElementById("restore-file").value = "";
     alert("復元完了");
   } catch (error) {
@@ -337,6 +537,7 @@ function deleteAllData() {
   renderTodayLabel();
   renderStaffList();
   renderCalendar(currentPayrollView.year, currentPayrollView.month);
+  renderStaffEditViewIfOpen();
 }
 
 function loadDayData(dateKey) {
@@ -376,6 +577,7 @@ function normalizeRecord(record, fallbackStaff = null) {
     name: safeRecord.name || (fallbackStaff && fallbackStaff.name) || "",
     in: safeRecord.in || "",
     out: safeRecord.out || "",
+    edited: !!safeRecord.edited,
     history: {
       in: Array.isArray(safeHistory.in) ? safeHistory.in : [],
       out: Array.isArray(safeHistory.out) ? safeHistory.out : []
@@ -592,6 +794,12 @@ function getPayrollRange(year, month) {
   const startMonthIndex = month - 2;
   const start = new Date(year, startMonthIndex, 21);
   const end = new Date(year, month - 1, 20);
+  return { start, end };
+}
+
+function getCalendarMonthRange(year, month) {
+  const start = new Date(year, month - 1, 1);
+  const end = new Date(year, month, 0);
   return { start, end };
 }
 
