@@ -275,6 +275,40 @@ body {
   font-weight: 700;
 }
 
+.server-url-label {
+  display: block;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.server-url-input {
+  width: 100%;
+  height: 46px;
+  padding: 0 12px;
+  border: 1px solid #b8c2cc;
+  border-radius: 10px;
+  background: #ffffff;
+  font-size: 18px;
+}
+
+.server-url-save-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  border: 1px solid #cfd8e3;
+  border-radius: 10px;
+  background: #ffffff;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.server-url-save-btn:hover {
+  background: #f7fbff;
+}
+
+
 .nursery-card {
   gap: 14px;
 }

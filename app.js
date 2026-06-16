@@ -2,6 +2,8 @@ const APP_KEY_PREFIX = "timecard_";
 const NURSERY_STORAGE_KEY = "selectedNursery";
 const DEFAULT_NURSERY = "m";
 const BACKUP_FILE_NAME = "timecard_backup.zip";
+const SERVER_URL_STORAGE_KEY = "timecard_server_url";
+const DEFAULT_SERVER_URL = "http://192.168.1.60:3000";
 const NURSERY_CONFIG = {
   m: { label: "こどもの森保育園", staffFile: "./staff_m.json" },
   y: { label: "こどもの森You保育園", staffFile: "./staff_y.json" }
@@ -494,33 +496,86 @@ async function backupCsv() {
 }
 
 async function sendBackupToServer() {
-  const ok = confirm("バックアップZIPをサーバーに送信しますか？");
+  const ok = confirm("タイムカードデータをサーバーに送信しますか？");
   if (!ok) return;
 
   try {
-    const blob = await createBackupZipBlob();
-    const response = await fetch(`/api/backup?filename=${encodeURIComponent(BACKUP_FILE_NAME)}`, {
+    const payload = collectTimecardJsonPayload();
+
+    if (!payload.items.length) {
+      alert("送信するデータがありません");
+      return;
+    }
+
+    const response = await fetch(buildApiUrl("/api/timecard"), {
       method: "POST",
-      headers: { "Content-Type": "application/zip" },
-      body: blob
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
     });
 
-    let result = null;
-    try {
-      result = await response.json();
-    } catch (error) {
-      result = null;
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result.ok) {
+      throw new Error(result.message || "送信失敗");
     }
 
-    if (!response.ok || !result || result.ok !== true) {
-      throw new Error(result && result.message ? result.message : "送信失敗");
-    }
-
-    alert("サーバーに送信しました。\n" + BACKUP_FILE_NAME);
+    alert(`サーバーに送信しました
+${result.count || payload.items.length}件`);
   } catch (error) {
     console.error(error);
-    alert("サーバーに送信できませんでした。\nサーバーが起動しているか確認してください。");
+    alert("サーバーに送信できませんでした");
   }
+}
+
+function collectTimecardJsonPayload() {
+  const items = [];
+  const dateKeyPattern = /^\d{4}-\d{2}-\d{2}$/;
+
+  Object.keys(localStorage).sort().forEach((storageKey) => {
+    if (!storageKey.startsWith(APP_KEY_PREFIX)) return;
+
+    const dateKey = storageKey.slice(APP_KEY_PREFIX.length);
+    if (!dateKeyPattern.test(dateKey)) return;
+
+    const raw = localStorage.getItem(storageKey);
+    if (!raw) return;
+
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch (_error) {
+      return;
+    }
+
+    items.push({ storageKey, dateKey, data });
+  });
+
+  return { app: "timecard", items };
+}
+
+function normalizeServerUrl(value) {
+  let url = String(value || "").trim();
+  if (!url) return DEFAULT_SERVER_URL;
+  url = url.replace(/\/+$/, "");
+  if (!/^https?:\/\//i.test(url)) {
+    url = `http://${url}`;
+  }
+  return url;
+}
+
+function getSavedServerUrl() {
+  return normalizeServerUrl(localStorage.getItem(SERVER_URL_STORAGE_KEY) || DEFAULT_SERVER_URL);
+}
+
+function saveServerUrlFromInput() {
+  const input = document.getElementById("server-url-input");
+  const url = normalizeServerUrl(input ? input.value : "");
+  localStorage.setItem(SERVER_URL_STORAGE_KEY, url);
+  if (input) input.value = url;
+  alert("サーバーURLを保存しました");
+}
+
+function buildApiUrl(apiPath) {
+  return `${getSavedServerUrl()}${apiPath}`;
 }
 
 async function restoreCsv(e) {
@@ -959,6 +1014,14 @@ function escapeJs(value) {
 }
 
 function setupAdminButtons() {
+  const serverUrlInput = document.getElementById("server-url-input");
+  const serverUrlSaveBtn = document.getElementById("server-url-save-btn");
+  if (serverUrlInput) {
+    serverUrlInput.value = getSavedServerUrl();
+  }
+  if (serverUrlSaveBtn) {
+    serverUrlSaveBtn.addEventListener("click", saveServerUrlFromInput);
+  }
   document.getElementById("backup-btn").addEventListener("click", backupCsv);
   document.getElementById("server-backup-btn").addEventListener("click", sendBackupToServer);
   document.getElementById("restore-btn").addEventListener("click", () => {
