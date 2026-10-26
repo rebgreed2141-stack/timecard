@@ -40,6 +40,14 @@ function setupTabs() {
 
   buttons.forEach((button) => {
     button.addEventListener("click", () => {
+      if (button.dataset.tab === "admin") {
+        const password = window.prompt("管理画面のパスワードを入力してください");
+        if (password === null) return;
+        if (password !== "123456") {
+          window.alert("パスワードが違います。");
+          return;
+        }
+      }
       buttons.forEach((btn) => btn.classList.remove("active"));
       document.querySelectorAll(".tab-panel").forEach((panel) => panel.classList.remove("active"));
 
